@@ -2,9 +2,10 @@ package PerlIO::via::Timeout;
 
 =head1 SYNOPSIS
 
-    use PerlIO::via::StripHTML;
-    open my $file, '<:via(StripHTML)', 'foo.html'
+    use PerlIO::via::Timeout;
+    open my $file, '<:via(Timeout)', 'foo.html'
 	or die "Can't open foo.html: $!\n";
+
 
 =head1 DESCRIPTION
 
@@ -18,31 +19,56 @@ require 5.008;
 use strict;
 use warnings;
 
-use Carp  qw[croak];
-use Errno qw[EBADF EINTR ETIMEDOUT];
+use Carp;
+use Errno qw(EBADF EINTR ETIMEDOUT);
+
+use Scalar::Util qw(blessed);
+
+use PerlIO::via::Timeout::Handle;
+my $handle_class = 'PerlIO::via::Timeout::Handle';
 
 sub PUSHED {
+    # $_[0] eq __PACKAGE__
+    #   and croak "Don't use 'via' directly on " . __PACKAGE__ . ". Use the 'new' constructor";
     my ($class, $mode, $fh) = @_;
+
+    my $current_class = blessed $fh;
+
+    if (defined $current_class) {
+        my $new_class = $handle_class . '__WITH__' . $current_class;
+        bless $fh, $new_class;
+        push @{"${new_class}::ISA"}, $current_class;
+    } else {
+        bless $fh, $handle_class;
+    }
+
+    $fh->isa($handle_class)
+      or push @{blessed($fh) . '::ISA'}, $handle_class;
 
     my $fd = fileno $fh;
     unless (defined $fd && $fd >= 0) {
         $! = EBADF;
         return -1;
     }
+
+    # default values
+
+    @{*$fh}{qw(_timeout_read _timeout_write _timeout_strategy _timeout_enabled)}
+      = (3, 3, $class->_default_strategy, 0);
+
     return bless({ mode => $mode,
-                   timeout_read => 0,
-                   timeout_write => 0,
-                   timeout_strategy => undef,                   
-                   timeout_enabled => 1,
                  }, $class);
 }
+
+# made to be overridden
+sub _default_strategy { 'Select' }
 
 sub READ {
     my ($self, undef, $len, $fh) = @_;
 
     my $off = 0;
     while () {
-        unless (can_read($fh, $self->{timeout})) {
+        unless (can_read($fh, ${*$fh}{_timeout_read})) {
             $! = ETIMEDOUT unless $!;
             return 0;
         }
@@ -65,7 +91,7 @@ sub WRITE {
     my $len = length $_[1];
     my $off = 0;
     while () {
-        unless (can_write($fh, $self->{timeout})) {
+        unless (can_write($fh, ${*$fh}{_timeout_write})) {
             $! = ETIMEDOUT unless $!;
             return -1;
         }
@@ -141,6 +167,17 @@ sub can_write {
     $! = 0;
     return $nfound;
 }
+
+# sub new {
+#     @_ % 2
+#       and croak 'usage: ' . __PACKAGE__ . '->new($fh, %optional_args)';
+#     my ($self, $fh, %args) = @_;
+#     timeout_read => 1,
+#     timeout_write => 1,
+#     timeout_strategy => undef,                   
+#     timeout_enabled => 1,
+
+# }
 
 1;
 
