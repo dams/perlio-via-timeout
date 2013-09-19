@@ -1,11 +1,23 @@
 package PerlIO::via::Timeout;
 
+use PerlIO::via::Timeout::Strategy::Default;
+
+use Module::Load;
+
 =head1 SYNOPSIS
 
-    use PerlIO::via::Timeout;
-    open my $file, '<:via(Timeout)', 'foo.html'
-	or die "Can't open foo.html: $!\n";
+  use PerlIO::via::Timeout;
+  open my $file, '<:via(Timeout)', 'foo.html'
+    or die "Can't open foo.html: $!\n";
 
+  # set read timeout to 0.5
+  handle_timeout_read($file, 0.5);
+  # enable timeout
+  enable_handle_timeout($file);
+
+  use Errno qw(ETIMEDOUT);
+  while (<$fh>) { ... }
+  if ($! == ETIMEDOUT) { ... }
 
 =head1 DESCRIPTION
 
@@ -22,28 +34,23 @@ use warnings;
 use Carp;
 use Errno qw(EBADF EINTR ETIMEDOUT);
 
-use Scalar::Util qw(blessed);
+#use Scalar::Util qw(reftype);
 
-use PerlIO::via::Timeout::Handle;
-my $handle_class = 'PerlIO::via::Timeout::Handle';
+#use Exporter 'import'; # gives you Exporter's import() method directly
+#our @EXPORT_OK = ( qw(timeout_enabled timeout_strategy), map { $_ . "_timeout" } qw(enable disable read write));
+#our %EXPORT_TAGS = (all => [ @EXPORT_OK ]);
+
+my %strategy;
+
+# my %fd_to_properties;
+# my $READ = 0;
+# my $WRITE = 1;
+# my $ENABLED = 2;
+# my $STRATEGY = 3;
+# my $STRAT_INST = 4;
 
 sub PUSHED {
-    # $_[0] eq __PACKAGE__
-    #   and croak "Don't use 'via' directly on " . __PACKAGE__ . ". Use the 'new' constructor";
     my ($class, $mode, $fh) = @_;
-
-    my $current_class = blessed $fh;
-
-    if (defined $current_class) {
-        my $new_class = $handle_class . '__WITH__' . $current_class;
-        bless $fh, $new_class;
-        push @{"${new_class}::ISA"}, $current_class;
-    } else {
-        bless $fh, $handle_class;
-    }
-
-    $fh->isa($handle_class)
-      or push @{blessed($fh) . '::ISA'}, $handle_class;
 
     my $fd = fileno $fh;
     unless (defined $fd && $fd >= 0) {
@@ -53,131 +60,108 @@ sub PUSHED {
 
     # default values
 
-    @{*$fh}{qw(_timeout_read _timeout_write _timeout_strategy _timeout_enabled)}
-      = (3, 3, $class->_default_strategy, 0);
+#    $fd_to_properties{$fd}
+      # = [ 3, # read_timeout
+      #     3, # write_timeout
+      #     0, # enabled
+      #     $class->_default_strategy, # strategy_timeout
+      #     undef, # strategy_instance
+      #   ];
 
-    return bless({ mode => $mode,
-                 }, $class);
+    return bless({ mode => $mode }, $class);
 }
 
+sub POPPED {
+    my ($self, $fh) = @_;
+    defined $fh or return;
+    my $fd = fileno $fh;
+    defined $fd or return;
+    delete $strategy{$fd};
+#    my $properties = delete $fd_to_properties{$fd}
+#      or return;
+#    $properties->[$STRAT_INST]->cleanup($fh, $fd);
+}
+
+sub CLOSE {
+    my ($self, $fh) = @_;
+    defined $fh or return;
+    my $fd = fileno $fh;
+    defined $fd or return;
+    delete $strategy{$fd};
+#    my $properties = delete $fd_to_properties{$fd}
+#      or return;
+#    $properties->[$STRAT_INST]->cleanup($fh, $fd);
+    close($fh);
+}
+
+# # Exported functions
+# sub read_timeout     { unshift @_, $READ; goto &_getter_setter }
+# sub write_timeout    { unshift @_, $WRITE; goto &_getter_setter }
+# sub timeout_enabled  { unshift @_, $ENABLED; goto &_getter_setter }
+# sub enable_timeout   { timeout_enabled($_[0], 1) }
+# sub disable_timeout  { timeout_enabled($_[0], 0) }
+
+# sub _getter_setter {
+#     my $pos = shift;
+#     reftype $_[0] eq 'GLOB' or croak 'bad usage. parameters: $fh, [ $value ]';
+#     my $fd = fileno $_[0];
+#     defined $fd or croak 'bad file descriptor for handle';
+#     @_ > 1 and $fd_to_properties{$fd}[$pos] = $_[1];
+#     $fd_to_properties{$fd}[$pos];
+# }
+
+# sub timeout_strategy {
+#     reftype $_[0] eq 'GLOB' or croak 'bad usage. parameters: $fh, [ $value ]';
+#     my $fd = fileno $_[0];
+#     defined $fd or croak 'bad file descriptor for handle';
+#     @_ > 1 and $fd_to_properties{$fd}[$STRAT] = $_[1], $fd_to_properties{$fd}[$STRAT_INST] = undef;
+#     $fd_to_properties{$fd}[$STRAT];
+# }
+
 # made to be overridden
-sub _default_strategy { 'Select' }
+#sub _default_strategy { 'Select' }
 
 sub READ {
-    my ($self, undef, $len, $fh) = @_;
-
-    my $off = 0;
-    while () {
-        unless (can_read($fh, ${*$fh}{_timeout_read})) {
-            $! = ETIMEDOUT unless $!;
-            return 0;
-        }
-        my $r = sysread($fh, $_[1], $len, $off);
-        if (defined $r) {
-            last unless $r;
-            $len -= $r;
-            $off += $r;
-        }
-        elsif ($! != EINTR) {
-            return 0;
-        }
+    # my ($self, undef, $len, $fh) = @_;
+    my $self = shift;
+    my $fd = fileno $_[2];
+    unless (defined $fd && $fd >= 0) {
+        $! = EBADF;
+        return 0;
     }
-    return $off;
+
+    my $strategy = ($strategy{$fd} ||= PerlIO::via::Timeout::Strategy::Default->new());
+    
+    $strategy->READ(@_);
 }
 
 sub WRITE {
-    my ($self, undef, $fh) = @_;
+#    my ($self, undef, $fh) = @_;
 
-    my $len = length $_[1];
-    my $off = 0;
-    while () {
-        unless (can_write($fh, ${*$fh}{_timeout_write})) {
-            $! = ETIMEDOUT unless $!;
-            return -1;
-        }
-        my $r = syswrite($fh, $_[1], $len, $off);
-        if (defined $r) {
-            $len -= $r;
-            $off += $r;
-            last unless $len;
-        }
-        elsif ($! != EINTR) {
-            return -1;
-        }
-    }
-    return $off;
-}
-
-sub can_read {
-    my ($fh, $timeout) = @_;
-
-    my $fd = fileno $fh;
+    my $self = shift;
+    my $fd = fileno $_[1];
     unless (defined $fd && $fd >= 0) {
         $! = EBADF;
-        return 0;
+        return -1;
     }
 
-    my $initial = time;
-    my $pending = $timeout;
-    my $nfound;
-
-    vec(my $fdset = '', $fd, 1) = 1;
-
-    while () {
-        $nfound = select($fdset, undef, undef, $pending);
-        if ($nfound == -1) {
-            $! == EINTR
-              or croak(qq/select(2): '$!'/);
-            redo if !$timeout || ($pending = $timeout - (time -
-            $initial)) > 0;
-            $nfound = 0;
-        }
-        last;
-    }
-    $! = 0;
-    return $nfound;
+    my $strategy = ($strategy{$fd} ||= PerlIO::via::Timeout::Strategy::Default->new());
+    
+    $strategy->WRITE(@_);
 }
 
-sub can_write {
-    my ($fh, $timeout) = @_;
-
-    my $fd = fileno $fh;
-    unless (defined $fd && $fd >= 0) {
-        $! = EBADF;
-        return 0;
-    }
-
-    my $initial = time;
-    my $pending = $timeout;
-    my $nfound;
-
-    vec(my $fdset = '', $fd, 1) = 1;
-
-    while () {
-        $nfound = select(undef, $fdset, undef, $pending);
-        if ($nfound == -1) {
-            $! == EINTR
-              or croak(qq/select(2): '$!'/);
-            redo if !$timeout || ($pending = $timeout - (time -
-            $initial)) > 0;
-            $nfound = 0;
-        }
-        last;
-    }
-    $! = 0;
-    return $nfound;
+sub timeout_strategy {
+     reftype $_[0] eq 'GLOB' or croak 'bad usage. parameters: $fh, [ $value ]';
+     my $fd = fileno $_[0];
+     defined $fd or croak 'bad file descriptor for handle';
+     if (@_ > 1) {
+         $strategy =~ s/^+//
+           or $strategy = 'PerlIO::via::Timeout::Strategy::' . $strategy;
+         load $strategy;
+         $strategy{$fd} = $strategy->new();
+     }
+     return $strategy{$fd};
 }
-
-# sub new {
-#     @_ % 2
-#       and croak 'usage: ' . __PACKAGE__ . '->new($fh, %optional_args)';
-#     my ($self, $fh, %args) = @_;
-#     timeout_read => 1,
-#     timeout_write => 1,
-#     timeout_strategy => undef,                   
-#     timeout_enabled => 1,
-
-# }
 
 1;
 

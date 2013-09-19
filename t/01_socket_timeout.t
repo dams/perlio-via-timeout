@@ -2,16 +2,12 @@ use strict;
 use warnings;
 
 use Test::More;
-use PerlIO::via::Timeout;
-
-
-#    my $etimeout = strerror(ETIMEDOUT);
-#    my $ereset   = strerror(ECONNRESET);
+use PerlIO::via::Timeout qw(:all);
 
 use Test::TCP;
 
 sub create_server {
-    my $delay = 2;
+    my $delay = shift;
     Test::TCP->new(
         code => sub {
             my $port   = shift;
@@ -42,40 +38,45 @@ sub create_server {
 }
 
 
-# subtest 'socket without timeout' => sub {
-#     my $server = create_server();
-#     my $client = IO::Socket::INET->new(
-#         PeerHost        => '127.0.0.1',
-#         PeerPort        => $server->port,
-#     );
-    
-#     binmode($client, ':via(Timeout)');
-    
-    
-#     $client->print("OK\n");
-#     my $response = $client->getline;
-#     print STDERR " --> $!\n";
-#     is $response, "SOK\n", "got proper response 1";
-# };
-
-subtest 'socket with timeout' => sub {
-    my $server = create_server();
+subtest 'socket without timeout' => sub {
+    my $server = create_server(2);
     my $client = IO::Socket::INET->new(
         PeerHost        => '127.0.0.1',
         PeerPort        => $server->port,
     );
     
-    print STDERR Dumper($client); use Data::Dumper;
     binmode($client, ':via(Timeout)');
-    print STDERR Dumper($client); use Data::Dumper;
-$DB::single = 1;
-    $client->enable_timeout;
-    $client->timeout_read(1);
+
+    print STDERR Dumper({%{*$client}}); use Data::Dumper;
     
     $client->print("OK\n");
     my $response = $client->getline;
     print STDERR " --> $!\n";
     is $response, "SOK\n", "got proper response 1";
+};
+
+subtest 'socket with timeout' => sub {
+    my $server = create_server(2);
+    my $client = IO::Socket::INET->new(
+        PeerHost        => '127.0.0.1',
+        PeerPort        => $server->port,
+    );
+    
+    use Scalar::Util qw(refaddr);
+    binmode($client, ':via(Timeout)');
+
+#    set_timeout_strategy($client, PerlIO::via::Timeout::Strategy::Select->new(read_timeout => 1));
+
+#    enable_timeout($client);
+#    read_timeout($client, 1);
+#    write_timeout($client, 1);
+
+#    print STDERR Dumper({%{*$client}}); use Data::Dumper;
+    
+    $client->print("OK\n");
+    my $response = $client->getline;
+    is $response, undef, "got undef response";
+    is $!, 'Operation timed out', "error is timeout";
 };
 
 # $client->print("OK\n");
