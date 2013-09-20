@@ -46,7 +46,7 @@ sub _get_fd {
 }
 
 sub PUSHED {
-    # parrams CLASS, MODE, FH
+    # params CLASS, MODE, FH
     my $fd = _get_fd($_[2]) or return -1;
     bless { }, $_[0];
 }
