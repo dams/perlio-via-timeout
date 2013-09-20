@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use PerlIO::via::Timeout qw(:all);
+use PerlIO::via::Timeout qw(timeout_strategy);
 
 use Test::TCP;
 
@@ -39,20 +39,22 @@ sub create_server {
 
 
 subtest 'socket without timeout' => sub {
-    my $server = create_server(2);
+    my $server = create_server(1);
     my $client = IO::Socket::INET->new(
         PeerHost        => '127.0.0.1',
         PeerPort        => $server->port,
     );
     
     binmode($client, ':via(Timeout)');
-
-    print STDERR Dumper({%{*$client}}); use Data::Dumper;
+    my $strategy = timeout_strategy($client);
+    is ref $strategy, 'PerlIO::via::Timeout::Strategy::NoTimeout', 'strategy is of type NoTimeout';
+    is $strategy->read_timeout, 0, 'strategy has default 0 read timeout';
+    is $strategy->write_timeout, 0, 'strategy has default 0 write timeout';
     
     $client->print("OK\n");
     my $response = $client->getline;
-    print STDERR " --> $!\n";
     is $response, "SOK\n", "got proper response 1";
+
 };
 
 subtest 'socket with timeout' => sub {
@@ -62,52 +64,18 @@ subtest 'socket with timeout' => sub {
         PeerPort        => $server->port,
     );
     
-    use Scalar::Util qw(refaddr);
     binmode($client, ':via(Timeout)');
+    timeout_strategy($client, 'Select', read_timeout => 0.5);
 
-#    set_timeout_strategy($client, PerlIO::via::Timeout::Strategy::Select->new(read_timeout => 1));
+    my $strategy = timeout_strategy($client);
+    is ref $strategy, 'PerlIO::via::Timeout::Strategy::Select', 'strategy is of type Select';
+    is $strategy->read_timeout, 0.5, 'strategy has proper read timeout';
+    is $strategy->write_timeout, 0, 'strategy has default 0 write timeout';
 
-#    enable_timeout($client);
-#    read_timeout($client, 1);
-#    write_timeout($client, 1);
-
-#    print STDERR Dumper({%{*$client}}); use Data::Dumper;
-    
-    $client->print("OK\n");
-    my $response = $client->getline;
+    print $client ("OK\n");
+    my $response = <$client>;
     is $response, undef, "got undef response";
     is $!, 'Operation timed out', "error is timeout";
 };
 
-# $client->print("OK\n");
-# $response = $client->getline;
-# print STDERR " --> $!\n";
-# is $response, "SOK\n", "got proper response 1";
-
-
-
-#    $p{callback}->($client, $etimeout, $ereset);
-
-# subtest 'test with no delays and no timeouts', sub {
-# TestTimeout->test( provider => 'SetSockOpt',
-#                    connection_delay => 0,
-#                    read_delay => 0,
-#                    write_delay => 0,
-#                    callback => sub {
-#                        my ($client) = @_;
-#                        $client->print("OK\n");
-#                        my $response = $client->getline;
-#                        is $response, "SOK\n", "got proper response 1";
-#                        $client->print("OK2\n");
-#                        $response = $client->getline;
-#                        is $response, "SOK2\n", "got proper response 2";
-#                    },
-#                  );
-# };
-
-
-# my $test_tempdir = temp_root();
-
-
-
-# my $directory_scratch_obj = scratch();
+done_testing;

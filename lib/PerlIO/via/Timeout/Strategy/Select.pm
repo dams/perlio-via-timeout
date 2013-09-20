@@ -1,19 +1,58 @@
 package PerlIO::via::Timeout::Strategy::Select;
 
-use Moo;
+# ABSTRACT: a L<PerlIO::via::Timeout> strategy that uses C<select>
 
-use parent 'PerlIO::via::Timeout::Strategy';
+require 5.008;
+use strict;
+use warnings;
+use Carp;
+use Errno qw(EINTR ETIMEDOUT);
 
-sub new {
-    my $class = shift;
-    my $self = $class->SUPER::new(@_);
-}
+use PerlIO::via::Timeout::Strategy::NoTimeout;
+our @ISA = qw(PerlIO::via::Timeout::Strategy::NoTimeout);
+
+=head1 DESCRIPTION
+
+This class implements a timeout strategy to be used by L<PerlIO::via::Timeout>.
+
+Timeout is implemented using the C<select> core function.
+
+=head1 SYNOPSIS
+
+  my $strategy = PerlIO::via::Timeout::Strategy::Select->new(
+      read_timeout => 1,
+      write_timeout => 2,
+  );
+
+=cut
+
+=method new
+
+Constructor of the strategy. Takes as arguments a list of key / values :
+
+=over
+
+=item read_timeout
+
+The read timeout in second. Can be a float
+
+=item write_timeout
+
+The write timeout in second. Can be a float
+
+=back
+
+=cut
 
 sub READ {
-    my ($self, undef, $len, $fh) = @_;
+    my ($self, undef, $len, $fh, $fd) = @_;
 
+    my $read_timeout = $self->{read_timeout}
+      or return shift->SUPER::READ(@_);
+
+    my $offset = 0;
     while () {
-        if ( $enabled && ! can_read($fh, $fd, $read_timeout)) {
+        if ( ! can_read_write($fh, $fd, $read_timeout, 0)) {
             $! = ETIMEDOUT unless $!;
             return 0;
         }
@@ -31,39 +70,34 @@ sub READ {
 }
 
 sub WRITE {
-    my ($self, undef, $fh) = @_;
+    my ($self, undef, $fh, $fd) = @_;
 
-    my $fd = fileno $fh;
-    unless (defined $fd && $fd >= 0) {
-        $! = EBADF;
-        return -1;
-    }
-
-    my (undef, $write_timeout, $strategy_timeout, $enabled) = @{$fd_to_properties{$fd}};
+    my $write_timeout = $self->{write_timeout}
+      or return shift->SUPER::WRITE(@_);
 
     my $len = length $_[1];
-    my $off = 0;
+    my $offset = 0;
     while () {
-        unless (can_write($fh, $fd, $write_timeout)) {
+        unless (can_read_write($fh, $fd, $write_timeout, 1)) {
             $! = ETIMEDOUT unless $!;
             return -1;
         }
-        my $r = syswrite($fh, $_[1], $len, $off);
+        my $r = syswrite($fh, $_[1], $len, $offset);
         if (defined $r) {
             $len -= $r;
-            $off += $r;
+            $offset += $r;
             last unless $len;
         }
         elsif ($! != EINTR) {
             return -1;
         }
     }
-    return $off;
+    return $offset;
 }
 
-sub can_read {
-    my ($fh, $fd, $timeout) = @_;
-
+sub can_read_write {
+    my ($fh, $fd, $timeout, $type) = @_;
+    # $type: 0 = read, 1 = write
     my $initial = time;
     my $pending = $timeout;
     my $nfound;
@@ -71,7 +105,13 @@ sub can_read {
     vec(my $fdset = '', $fd, 1) = 1;
 
     while () {
-        $nfound = select($fdset, undef, undef, $pending);
+        if ($type) {
+            # write
+            $nfound = select(undef, $fdset, undef, $pending);
+        } else {
+            # read
+            $nfound = select($fdset, undef, undef, $pending);
+        }
         if ($nfound == -1) {
             $! == EINTR
               or croak(qq/select(2): '$!'/);
@@ -85,28 +125,14 @@ sub can_read {
     return $nfound;
 }
 
-sub can_write {
-    my ($fh, $fd, $timeout) = @_;
+=head1 SEE ALSO
 
-    my $initial = time;
-    my $pending = $timeout;
-    my $nfound;
+=over
 
-    vec(my $fdset = '', $fd, 1) = 1;
+=item L<PerlIO::via::Timeout>
 
-    while () {
-        $nfound = select(undef, $fdset, undef, $pending);
-        if ($nfound == -1) {
-            $! == EINTR
-              or croak(qq/select(2): '$!'/);
-            redo if !$timeout || ($pending = $timeout - (time -
-            $initial)) > 0;
-            $nfound = 0;
-        }
-        last;
-    }
-    $! = 0;
-    return $nfound;
-}
+=back
+
+=cut
 
 1;
