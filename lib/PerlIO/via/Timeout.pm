@@ -119,4 +119,16 @@ sub timeout_strategy {
 
 =back
 
+=head1 THANKS TO
+
+=over
+
+=item Vincent Pit
+
+=item Christian Hansen
+
+=item Leon Timmmermans
+
+=back
+
 =cut
