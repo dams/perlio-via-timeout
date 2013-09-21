@@ -75,7 +75,7 @@ subtest 'socket with timeout' => sub {
     print $client ("OK\n");
     my $response = <$client>;
     is $response, undef, "got undef response";
-    is $!, 'Operation timed out', "error is timeout";
+    like $!, qr/timed out/, "error is timeout";
 };
 
 done_testing;
