@@ -1,4 +1,5 @@
 {{$NEXT}}
+        . fix tests
 
 0.11      2013-09-21 19:06:01 Europe/Paris
 
