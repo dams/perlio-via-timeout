@@ -52,7 +52,7 @@ sub READ {
 
     my $offset = 0;
     while () {
-        if ( ! can_read_write($fh, $fd, $read_timeout, 0)) {
+        if ( $len && ! can_read_write($fh, $fd, $read_timeout, 0)) {
             $! = ETIMEDOUT unless $!;
             return 0;
         }
