@@ -47,6 +47,9 @@ The write timeout in second. Can be a float
 sub READ {
     my ($self, undef, $len, $fh, $fd) = @_;
 
+    $self->{timeout_enabled}
+      or return shift->SUPER::READ(@_);
+
     my $read_timeout = $self->{read_timeout}
       or return shift->SUPER::READ(@_);
 
@@ -71,6 +74,9 @@ sub READ {
 
 sub WRITE {
     my ($self, undef, $fh, $fd) = @_;
+
+    $self->{timeout_enabled}
+      or return shift->SUPER::WRITE(@_);
 
     my $write_timeout = $self->{write_timeout}
       or return shift->SUPER::WRITE(@_);

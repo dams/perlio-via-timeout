@@ -79,4 +79,24 @@ subtest 'socket with timeout' => sub {
     is(0+$!, ETIMEDOUT, "error is timeout");
 };
 
+subtest 'socket with disabled timeout' => sub {
+    my $server = create_server(2);
+    my $client = IO::Socket::INET->new(
+        PeerHost        => '127.0.0.1',
+        PeerPort        => $server->port,
+    );
+    
+    binmode($client, ':via(Timeout)');
+    my $strategy = timeout_strategy($client, 'Select', read_timeout => 0.5);
+    $strategy->disable_timeout(0);
+    is ref $strategy, 'PerlIO::via::Timeout::Strategy::Select', 'strategy is of type Select';
+    is $strategy->read_timeout, 0.5, 'strategy has 0.5 read timeout';
+    is $strategy->write_timeout, 0, 'strategy has default 0 write timeout';
+    
+    $client->print("OK\n");
+    my $response = $client->getline;
+    is $response, "SOK\n", "got proper response 1";
+
+};
+
 done_testing;
