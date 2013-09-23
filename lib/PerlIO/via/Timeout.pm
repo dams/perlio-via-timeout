@@ -46,7 +46,7 @@ sub _get_fd {
 }
 
 sub PUSHED {
-    # parrams CLASS, MODE, FH
+    # params CLASS, MODE, FH
     my $fd = _get_fd($_[2]) or return -1;
     bless { }, $_[0];
 }
@@ -116,6 +116,18 @@ sub timeout_strategy {
 =item L<PerlIO::via::Timeout::Strategy::Select>
 
 =item L<PerlIO::via>
+
+=back
+
+=head1 THANKS TO
+
+=over
+
+=item Vincent Pit
+
+=item Christian Hansen
+
+=item Leon Timmmermans
 
 =back
 
