@@ -78,7 +78,7 @@ sub WRITE {
     my $len = length $_[1];
     my $offset = 0;
     while () {
-        unless (can_read_write($fh, $fd, $write_timeout, 1)) {
+        if ( $len && ! can_read_write($fh, $fd, $write_timeout, 1)) {
             $! = ETIMEDOUT unless $!;
             return -1;
         }
