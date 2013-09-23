@@ -5,6 +5,7 @@ use Test::More;
 use PerlIO::via::Timeout qw(timeout_strategy);
 
 use Test::TCP;
+use Errno qw(ETIMEDOUT);
 
 sub create_server {
     my $delay = shift;
@@ -75,7 +76,7 @@ subtest 'socket with timeout' => sub {
     print $client ("OK\n");
     my $response = <$client>;
     is $response, undef, "got undef response";
-    is $!, 'Operation timed out', "error is timeout";
+    is(0+$!, ETIMEDOUT, "error is timeout");
 };
 
 done_testing;
