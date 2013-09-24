@@ -1,5 +1,10 @@
 {{$NEXT}}
 
+0.14      2013-09-24 17:31:53 Europe/Paris
+        . fixed a lot of small bugs
+        . implemented passing an instance of Strategy
+        . new strategy, Alarm
+
 0.13      2013-09-23 14:58:52 Europe/Paris
         . fix bug when reading last character of a fh
 
