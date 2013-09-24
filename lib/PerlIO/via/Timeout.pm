@@ -7,7 +7,7 @@ use strict;
 use warnings;
 use Carp;
 use Errno qw(EBADF);
-use Scalar::Util qw(reftype);
+use Scalar::Util qw(reftype blessed);
 
 use PerlIO::via::Timeout::Strategy::NoTimeout;
 
@@ -47,30 +47,34 @@ sub _get_fd {
 
 sub PUSHED {
     # params CLASS, MODE, FH
-    my $fd = _get_fd($_[2]) or return -1;
+    defined (my $fd = _get_fd $_[2] ) or return -1;
     bless { }, $_[0];
 }
 
+sub POPPED {
 # params: SELF [, FH ]
-sub POPPED { delete $strategy{_get_fd $_[1] or return} }
+    defined (my $fd = _get_fd $_[1]) or return;
+    delete $strategy{$fd}
+}
 
 sub CLOSE {
     # params: SELF, FH
-    delete $strategy{_get_fd $_[1] or return};
+    defined (my $fd = _get_fd $_[1]) or return;
+    delete $strategy{$fd};
     close $_[1];
 }
 
 sub READ {
     # params: SELF, BUF, LEN, FH
     my $self = shift;
-    my $fd = _get_fd $_[2] or return 0;
+    defined (my $fd = _get_fd $_[2]) or return 0;
     ($strategy{$fd} ||= PerlIO::via::Timeout::Strategy::NoTimeout->new())->READ(@_, $fd);
 }
 
 sub WRITE {
     # params: SELF, BUF, FH
     my $self = shift;
-    my $fd = _get_fd $_[1] or return -1;
+    defined (my $fd = _get_fd $_[1]) or return -1;
     ($strategy{$fd} ||= PerlIO::via::Timeout::Strategy::NoTimeout->new())->WRITE(@_, $fd);
 }
 
@@ -80,8 +84,8 @@ sub WRITE {
   # read_timeout and set it to $fh
   timeout_strategy($fh, 'Select', read_timeout => 0.5);
 
-  # same but give a strategy instance directly
-  my $strategy = PerlIO::via::Timeout::Strategy::Select->new(write_timeout => 2)
+  # same but give an alarm strategy instance directly
+  my $strategy = PerlIO::via::Timeout::Strategy::Alarm->new(write_timeout => 2)
   timeout_strategy($fh, $strategy);
 
   # used as a getter, returns the current strategy
@@ -91,29 +95,42 @@ sub WRITE {
 
 sub timeout_strategy {
     # params: FH [, STRATEGY, PARAMS]
-    @_ && reftype $_[0] eq 'GLOB' or croak 'timeout(FH [, STRATEGY, PARAMS... ])';
-    my $fd = _get_fd $_[0] or croak 'bad file descriptor for handle';
+    @_ and reftype $_[0] || '' eq 'GLOB' or croak 'timeout(FH [, STRATEGY, PARAMS... ])';
+    defined (my $fd = _get_fd $_[0]) or croak 'bad file descriptor for handle';
     if (@_ > 1) {
         shift;
         my $strategy = shift;
-        $strategy =~ s/^\+//
-          or $strategy = 'PerlIO::via::Timeout::Strategy::' . $strategy;
-        my $file = $strategy;
-        $file =~ s!::|'!/!g;
-        $file .= '.pm';
-        require $file;
-        $strategy{$fd} = $strategy->new(@_);
+        if (blessed $strategy) {
+            $strategy{$fd} = $strategy;
+            $strategy{$fd}{_fd} = $fd;
+        } else {
+            $strategy =~ s/^\+//
+              or $strategy = 'PerlIO::via::Timeout::Strategy::' . $strategy;
+            my $file = $strategy;
+            $file =~ s!::|'!/!g;
+            $file .= '.pm';
+            require $file;
+            $strategy{$fd} = $strategy->new(_fd => $fd, @_);
+        }
     }
     return $strategy{$fd} ||= PerlIO::via::Timeout::Strategy::NoTimeout->new();
 }
 
 1;
 
-=head1 SEE ALSO
+=head1 AVAILABLE STRATEGIES
 
 =over
 
 =item L<PerlIO::via::Timeout::Strategy::Select>
+
+=item L<PerlIO::via::Timeout::Strategy::Alarm>
+
+=back
+
+=head1 SEE ALSO
+
+=over
 
 =item L<PerlIO::via>
 

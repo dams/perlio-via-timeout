@@ -54,7 +54,7 @@ subtest 'socket without timeout' => sub {
     
     $client->print("OK\n");
     my $response = $client->getline;
-    is $response, "SOK\n", "got proper response 1";
+    is $response, "SOK\n", "got proper response";
 
 };
 
@@ -95,8 +95,50 @@ subtest 'socket with disabled timeout' => sub {
     
     $client->print("OK\n");
     my $response = $client->getline;
-    is $response, "SOK\n", "got proper response 1";
+    is $response, "SOK\n", "got proper response";
 
+};
+
+subtest 'socket with alarm timeout' => sub {
+    my $server = create_server(2);
+    my $client = IO::Socket::INET->new(
+        PeerHost        => '127.0.0.1',
+        PeerPort        => $server->port,
+    );
+    
+    binmode($client, ':via(Timeout)');
+    timeout_strategy($client, 'Alarm', read_timeout => 0.5);
+
+    my $strategy = timeout_strategy($client);
+    is ref $strategy, 'PerlIO::via::Timeout::Strategy::Alarm', 'strategy is of type Alarm';
+    is $strategy->read_timeout, 0.5, 'strategy has proper read timeout';
+    is $strategy->write_timeout, 0, 'strategy has default 0 write timeout';
+
+    print $client ("OK\n");
+    my $response = <$client>;
+    is $response, undef, "got undef response";
+    is(0+$!, ETIMEDOUT, "error is timeout");
+};
+
+subtest 'socket with alarm timeout not hitting timeout' => sub {
+    my $server = create_server(1);
+    my $client = IO::Socket::INET->new(
+        PeerHost        => '127.0.0.1',
+        PeerPort        => $server->port,
+    );
+    
+    binmode($client, ':via(Timeout)');
+    timeout_strategy($client, 'Alarm', read_timeout => 3);
+
+    my $strategy = timeout_strategy($client);
+    is ref $strategy, 'PerlIO::via::Timeout::Strategy::Alarm', 'strategy is of type Alarm';
+    is $strategy->read_timeout, 3, 'strategy has proper read timeout';
+    is $strategy->write_timeout, 0, 'strategy has default 0 write timeout';
+
+    print $client ("OK\n");
+    my $response = <$client>;
+    is $response, "SOK\n", "got proper response";
+#    is(0+$!, ETIMEDOUT, "error is timeout");
 };
 
 done_testing;

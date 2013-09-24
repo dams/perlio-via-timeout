@@ -8,8 +8,7 @@ use warnings;
 use Carp;
 use Errno qw(EINTR ETIMEDOUT);
 
-use PerlIO::via::Timeout::Strategy::NoTimeout;
-our @ISA = qw(PerlIO::via::Timeout::Strategy::NoTimeout);
+use parent qw(PerlIO::via::Timeout::Strategy::NoTimeout);
 
 =head1 DESCRIPTION
 
@@ -19,10 +18,9 @@ Timeout is implemented using the C<select> core function.
 
 =head1 SYNOPSIS
 
-  my $strategy = PerlIO::via::Timeout::Strategy::Select->new(
-      read_timeout => 1,
-      write_timeout => 2,
-  );
+  use PerlIO::via::Timeout qw(timeout_strategy);
+  binmode($fh, ':via(Timeout)');
+  timeout_strategy($fh, 'Select', read_timeout => 0.5);
 
 =cut
 
@@ -40,6 +38,10 @@ The read timeout in second. Can be a float
 
 The write timeout in second. Can be a float
 
+=item timeout_enabled
+
+Boolean. Defaults to 1
+
 =back
 
 =cut
@@ -47,10 +49,10 @@ The write timeout in second. Can be a float
 sub READ {
     my ($self, undef, $len, $fh, $fd) = @_;
 
-    $self->{timeout_enabled}
+    $self->timeout_enabled
       or return shift->SUPER::READ(@_);
 
-    my $read_timeout = $self->{read_timeout}
+    my $read_timeout = $self->read_timeout
       or return shift->SUPER::READ(@_);
 
     my $offset = 0;
@@ -75,10 +77,10 @@ sub READ {
 sub WRITE {
     my ($self, undef, $fh, $fd) = @_;
 
-    $self->{timeout_enabled}
+    $self->timeout_enabled
       or return shift->SUPER::WRITE(@_);
 
-    my $write_timeout = $self->{write_timeout}
+    my $write_timeout = $self->write_timeout
       or return shift->SUPER::WRITE(@_);
 
     my $len = length $_[1];
