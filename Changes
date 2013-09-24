@@ -1,5 +1,7 @@
 {{$NEXT}}
 
+0.15      2013-09-24 17:53:49 Europe/Paris
+
 0.14      2013-09-24 17:31:53 Europe/Paris
         . fixed a lot of small bugs
         . implemented passing an instance of Strategy
