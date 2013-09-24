@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.16      2013-09-24 18:02:06 Europe/Paris
+        . don't use Time::HiRes anymore
+        . updated prereqs
+
 0.15      2013-09-24 17:53:49 Europe/Paris
 
 0.14      2013-09-24 17:31:53 Europe/Paris
