@@ -11,7 +11,7 @@ use Errno qw(ETIMEDOUT);
 use parent qw(PerlIO::via::Timeout::Strategy::NoTimeout);
 
 use Time::Out qw(timeout);
-use Time::Hires;
+use Time::HiRes;
 
 =head1 DESCRIPTION
 
@@ -53,6 +53,12 @@ Boolean. Defaults to 1
 Doesn't work on Windows
 
 =cut
+
+sub new {
+    $^O eq 'MSWin32'
+      and croak "This Strategy is not supported on 'MSWin32'";
+    return shift->SUPER::new(@_);
+}
 
 sub READ {
     my ($self, undef, $len, $fh, $fd) = @_;

@@ -121,6 +121,7 @@ subtest 'socket with alarm timeout' => sub {
 };
 
 subtest 'socket with alarm timeout not hitting timeout' => sub {
+    plan( skip_all => 'skip failing executable tests on windows' ) if $^O eq 'MSWin32';
     my $server = create_server(1);
     my $client = IO::Socket::INET->new(
         PeerHost        => '127.0.0.1',
