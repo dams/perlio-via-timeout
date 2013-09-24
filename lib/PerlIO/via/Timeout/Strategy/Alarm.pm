@@ -11,7 +11,6 @@ use Errno qw(ETIMEDOUT);
 use parent qw(PerlIO::via::Timeout::Strategy::NoTimeout);
 
 use Time::Out qw(timeout);
-use Time::HiRes;
 
 =head1 DESCRIPTION
 
@@ -22,11 +21,16 @@ function, but with a safe harness.
 
 =head1 SYNOPSIS
 
+  use Time::HiRes;
   use PerlIO::via::Timeout qw(timeout_strategy);
   binmode($fh, ':via(Timeout)');
   timeout_strategy($fh, 'Alarm', read_timeout => 0.5);
 
 =cut
+
+=head1 UNDER THE SECOND TIMEOUTS
+
+Warning, if you need timeout at a precision finer than the second, you need to use L<Time::HiRes>.
 
 =method new
 
