@@ -5,10 +5,19 @@ package PerlIO::via::Timeout::Strategy::NoTimeout;
 =DESCRIPTION
 
 This class is the default strategy used by L<PerlIO::via::Timeout> if none is
-provided. This strategy does B<not> apply any timeout on the filehandle.
+provided. It inherits L<PerlIO::via::Timeout::Strategy>. This strategy does
+B<not> apply any timeout on the filehandle.
 
-This strategy is only useful for other strategies to herit from. It should not
+This strategy is only useful for other strategies to inherit from. It should B<not>
 be used directly.
+
+=head1 CONSTRUCTOR
+
+See L<PerlIO::via::Timeout::Strategy>.
+
+=head1 METHODS
+
+See L<PerlIO::via::Timeout::Strategy>.
 
 =cut
 

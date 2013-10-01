@@ -15,6 +15,7 @@ use Time::Out qw(timeout);
 =head1 DESCRIPTION
 
 This class implements a timeout strategy to be used by L<PerlIO::via::Timeout>.
+It inherits L<PerlIO::via::Timeout::Strategy>.
 
 Timeout is implemented using the L<Time::Out>, which uses the C<alarm> core
 function, but with a safe harness.
@@ -26,31 +27,17 @@ function, but with a safe harness.
   binmode($fh, ':via(Timeout)');
   timeout_strategy($fh, 'Alarm', read_timeout => 0.5);
 
-=cut
-
 =head1 UNDER THE SECOND TIMEOUTS
 
 Warning, if you need timeout at a precision finer than the second, you need to use L<Time::HiRes>.
 
-=method new
+=head1 CONSTRUCTOR
 
-Constructor of the strategy. Takes as arguments a list of key / values :
+See L<PerlIO::via::Timeout::Strategy>.
 
-=over
+=head1 METHODS
 
-=item read_timeout
-
-The read timeout in second. Can be a float
-
-=item write_timeout
-
-The write timeout in second. Can be a float
-
-=item timeout_enabled
-
-Boolean. Defaults to 1
-
-=back
+See L<PerlIO::via::Timeout::Strategy>.
 
 =head1 COMPATIBILITY
 

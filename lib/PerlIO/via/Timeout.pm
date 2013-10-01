@@ -80,6 +80,8 @@ sub WRITE {
 
 =func timeout_strategy
 
+Get or set a strategy to a handle.
+
   # creates a L<PerlIO::via::Timeout::Strategy::Select strategy> with 0.5
   # read_timeout and set it to $fh
   timeout_strategy($fh, 'Select', read_timeout => 0.5);
@@ -90,6 +92,10 @@ sub WRITE {
 
   # used as a getter, returns the current strategy
   my $strategy = timeout_strategy($fh);
+  $strategy->disable_timeout;
+
+See L<PerlIO::via::Timeout::Strategy> for more details on the common strategies
+methods.
 
 =cut
 
@@ -131,6 +137,8 @@ sub timeout_strategy {
 =head1 SEE ALSO
 
 =over
+
+=item L<PerlIO::via::Timeout::Strategy>
 
 =item L<PerlIO::via>
 

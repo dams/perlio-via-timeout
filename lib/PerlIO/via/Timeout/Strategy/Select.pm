@@ -13,6 +13,7 @@ use parent qw(PerlIO::via::Timeout::Strategy::NoTimeout);
 =head1 DESCRIPTION
 
 This class implements a timeout strategy to be used by L<PerlIO::via::Timeout>.
+It inherits L<PerlIO::via::Timeout::Strategy>.
 
 Timeout is implemented using the C<select> core function.
 
@@ -22,27 +23,13 @@ Timeout is implemented using the C<select> core function.
   binmode($fh, ':via(Timeout)');
   timeout_strategy($fh, 'Select', read_timeout => 0.5);
 
-=cut
+=head1 CONSTRUCTOR
 
-=method new
+See L<PerlIO::via::Timeout::Strategy>.
 
-Constructor of the strategy. Takes as arguments a list of key / values :
+=head1 METHODS
 
-=over
-
-=item read_timeout
-
-The read timeout in second. Can be a float
-
-=item write_timeout
-
-The write timeout in second. Can be a float
-
-=item timeout_enabled
-
-Boolean. Defaults to 1
-
-=back
+See L<PerlIO::via::Timeout::Strategy>.
 
 =cut
 
@@ -57,7 +44,7 @@ sub READ {
 
     my $offset = 0;
     while () {
-        if ( $len && ! can_read_write($fh, $fd, $read_timeout, 0)) {
+        if ( $len && ! _can_read_write($fh, $fd, $read_timeout, 0)) {
             $! = ETIMEDOUT unless $!;
             return 0;
         }
@@ -86,7 +73,7 @@ sub WRITE {
     my $len = length $_[1];
     my $offset = 0;
     while () {
-        if ( $len && ! can_read_write($fh, $fd, $write_timeout, 1)) {
+        if ( $len && ! _can_read_write($fh, $fd, $write_timeout, 1)) {
             $! = ETIMEDOUT unless $!;
             return -1;
         }
@@ -103,7 +90,7 @@ sub WRITE {
     return $offset;
 }
 
-sub can_read_write {
+sub _can_read_write {
     my ($fh, $fd, $timeout, $type) = @_;
     # $type: 0 = read, 1 = write
     my $initial = time;
