@@ -1,5 +1,8 @@
 {{$NEXT}}
 
+0.17      2013-10-01 12:58:34 Europe/Paris
+        . fixed enable/disable timeout
+
 0.16      2013-09-24 18:02:06 Europe/Paris
         . don't use Time::HiRes anymore
         . updated prereqs
