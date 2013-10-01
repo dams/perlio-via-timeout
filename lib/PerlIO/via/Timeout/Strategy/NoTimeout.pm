@@ -34,7 +34,7 @@ sub READ {
 
 sub WRITE {
     my ($self, undef, $fh, $fd) = @_;
-    my $rv syswrite($fh, $_[1]);
+    my $rv = syswrite($fh, $_[1]);
     defined $rv
       or return -1;
     return $rv;
