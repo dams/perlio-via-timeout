@@ -1,5 +1,8 @@
 {{$NEXT}}
 
+0.20      2013-10-03 15:54:10 Europe/Paris
+        . take care of EINTR in the Notimeout strategy.
+
 0.19      2013-10-01 16:33:25 Europe/Paris
 
 0.18      2013-10-01 15:39:13 Europe/Paris
