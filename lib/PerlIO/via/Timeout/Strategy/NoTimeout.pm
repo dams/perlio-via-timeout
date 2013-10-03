@@ -53,10 +53,20 @@ sub READ {
 
 sub WRITE {
     my ($self, undef, $fh, $fd) = @_;
-    my $rv = syswrite($fh, $_[1]);
-    defined $rv
-      or return -1;
-    return $rv;
+    my $len = length $_[1];
+    my $offset = 0;
+    while () {
+        my $r = syswrite($fh, $_[1], $len, $offset);
+        if (defined $r) {
+            $len -= $r;
+            $offset += $r;
+            last unless $len;
+        }
+        elsif ($! != EINTR) {
+            return -1;
+        }
+    }
+    return $offset;
 }
 
 1;
