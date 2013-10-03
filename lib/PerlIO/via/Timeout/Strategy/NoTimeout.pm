@@ -24,21 +24,31 @@ See L<PerlIO::via::Timeout::Strategy>.
 require 5.008;
 use strict;
 use warnings;
+use Errno qw(EINTR);
 
 use PerlIO::via::Timeout::Strategy;
 our @ISA = qw(PerlIO::via::Timeout::Strategy);
 
+
 sub READ {
     my ($self, undef, $len, $fh, $fd) = @_;
-    my $rv = sysread($fh, $_[1], $len);
-    if (! defined $rv) {
-        # There is a bug in PerlIO::via (possibly in PerlIO ?). We would like
-        # to return -1 to signify error, but doing so doesn't work (it usually
-        # segfault), it looks like the implementation is not complete. So we
-        # return 0.
-        $rv = 0;
+    my $offset = 0;
+    while () {
+        my $r = sysread($fh, $_[1], $len, $offset);
+        if (defined $r) {
+            last unless $r;
+            $len -= $r;
+            $offset += $r;
+        }
+        elsif ($! != EINTR) {
+            # There is a bug in PerlIO::via (possibly in PerlIO ?). We would like
+            # to return -1 to signify error, but doing so doesn't work (it usually
+            # segfault), it looks like the implementation is not complete. So we
+            # return 0.
+            return 0;
+        }
     }
-    return $rv;
+    return $offset;
 }
 
 sub WRITE {

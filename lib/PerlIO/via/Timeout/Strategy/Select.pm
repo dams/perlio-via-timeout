@@ -55,6 +55,10 @@ sub READ {
             $offset += $r;
         }
         elsif ($! != EINTR) {
+            # There is a bug in PerlIO::via (possibly in PerlIO ?). We would like
+            # to return -1 to signify error, but doing so doesn't work (it usually
+            # segfault), it looks like the implementation is not complete. So we
+            # return 0.
             return 0;
         }
     }
