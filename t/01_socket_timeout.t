@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use PerlIO::via::Timeout qw(timeout_strategy);
+use PerlIO::via::Timeout qw(:all);
 
 use Test::TCP;
 use Errno qw(ETIMEDOUT);
@@ -47,11 +47,10 @@ subtest 'socket without timeout' => sub {
     );
     
     binmode($client, ':via(Timeout)');
-    my $strategy = timeout_strategy($client);
-    is ref $strategy, 'PerlIO::via::Timeout::Strategy::NoTimeout', 'strategy is of type NoTimeout';
-    is $strategy->read_timeout, 0, 'strategy has default 0 read timeout';
-    is $strategy->write_timeout, 0, 'strategy has default 0 write timeout';
+    is read_timeout($client), 0, 'layer has default 0 read timeout';
+    is write_timeout($client), 0, 'layer has default 0 write timeout';
     
+
     $client->print("OK\n");
     my $response = $client->getline;
     is $response, "SOK\n", "got proper response";
@@ -66,12 +65,11 @@ subtest 'socket with timeout' => sub {
     );
     
     binmode($client, ':via(Timeout)');
-    timeout_strategy($client, 'Select', read_timeout => 0.5);
+    read_timeout($client, 0.5);
 
-    my $strategy = timeout_strategy($client);
-    is ref $strategy, 'PerlIO::via::Timeout::Strategy::Select', 'strategy is of type Select';
-    is $strategy->read_timeout, 0.5, 'strategy has proper read timeout';
-    is $strategy->write_timeout, 0, 'strategy has default 0 write timeout';
+    is timeout_enabled($client), 1, 'layer has timeout enabled';
+    is read_timeout($client), 0.5, 'layer has proper read timeout';
+    is write_timeout($client), 0, 'layer has default 0 write timeout';
 
     print $client ("OK\n");
     my $response = <$client>;
@@ -87,59 +85,15 @@ subtest 'socket with disabled timeout' => sub {
     );
     
     binmode($client, ':via(Timeout)');
-    my $strategy = timeout_strategy($client, 'Select', read_timeout => 0.5);
-    $strategy->disable_timeout(0);
-    is ref $strategy, 'PerlIO::via::Timeout::Strategy::Select', 'strategy is of type Select';
-    is $strategy->read_timeout, 0.5, 'strategy has 0.5 read timeout';
-    is $strategy->write_timeout, 0, 'strategy has default 0 write timeout';
+    read_timeout($client, 0.5);
+    disable_timeout($client, 0);
+    is read_timeout($client), 0.5, 'layer has 0.5 read timeout';
+    is write_timeout($client), 0, 'layer has default 0 write timeout';
     
     $client->print("OK\n");
     my $response = $client->getline;
     is $response, "SOK\n", "got proper response";
 
-};
-
-subtest 'socket with alarm timeout' => sub {
-    my $server = create_server(2);
-    my $client = IO::Socket::INET->new(
-        PeerHost        => '127.0.0.1',
-        PeerPort        => $server->port,
-    );
-    
-    binmode($client, ':via(Timeout)');
-    timeout_strategy($client, 'Alarm', read_timeout => 0.5);
-
-    my $strategy = timeout_strategy($client);
-    is ref $strategy, 'PerlIO::via::Timeout::Strategy::Alarm', 'strategy is of type Alarm';
-    is $strategy->read_timeout, 0.5, 'strategy has proper read timeout';
-    is $strategy->write_timeout, 0, 'strategy has default 0 write timeout';
-
-    print $client ("OK\n");
-    my $response = <$client>;
-    is $response, undef, "got undef response";
-    is(0+$!, ETIMEDOUT, "error is timeout");
-};
-
-subtest 'socket with alarm timeout not hitting timeout' => sub {
-    plan( skip_all => 'skip failing executable tests on windows' ) if $^O eq 'MSWin32';
-    my $server = create_server(1);
-    my $client = IO::Socket::INET->new(
-        PeerHost        => '127.0.0.1',
-        PeerPort        => $server->port,
-    );
-    
-    binmode($client, ':via(Timeout)');
-    timeout_strategy($client, 'Alarm', read_timeout => 3);
-
-    my $strategy = timeout_strategy($client);
-    is ref $strategy, 'PerlIO::via::Timeout::Strategy::Alarm', 'strategy is of type Alarm';
-    is $strategy->read_timeout, 3, 'strategy has proper read timeout';
-    is $strategy->write_timeout, 0, 'strategy has default 0 write timeout';
-
-    print $client ("OK\n");
-    my $response = <$client>;
-    is $response, "SOK\n", "got proper response";
-#    is(0+$!, ETIMEDOUT, "error is timeout");
 };
 
 done_testing;

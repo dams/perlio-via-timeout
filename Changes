@@ -1,4 +1,5 @@
 {{$NEXT}}
+        . Get rid of Alarm strategy. Simplify the code. Change the API a bit
 
 0.21      2013-10-03 17:43:12 Europe/Paris
         . take care of EINTR in the Notimeout strategy.
