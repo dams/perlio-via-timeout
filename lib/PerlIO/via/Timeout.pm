@@ -18,7 +18,7 @@ our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 =head1 DESCRIPTION
 
 This package implements a PerlIO layer, that adds read / write timeout. This
-can be useful to avoid blocking while accessing a handle (file, socker, ...),
+can be useful to avoid blocking while accessing a handle (file, socket, ...),
 and fail after some time.
 
 =head1 SYNOPSIS
