@@ -49,6 +49,11 @@ sub _get_fd {
     $fd;
 }
 
+sub _fh2prop {
+    # params: self, $fh
+    $fd2prop{_get_fd $_[1]}
+}
+
 sub PUSHED {
     # params CLASS, MODE, FH
     $fd2prop{_get_fd $_[2]} = { timeout_enabled => 1, read_timeout => 0, write_timeout => 0};
