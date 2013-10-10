@@ -22,7 +22,7 @@ PerlIO::via::Timeout - a PerlIO layer that adds read & write timeout to a handle
 =head1 DESCRIPTION
 
 This package implements a PerlIO layer, that adds read / write timeout. This
-can be useful to avoid blocking while accessing a handle (file, socker, ...),
+can be useful to avoid blocking while accessing a handle (file, socket, ...),
 and fail after some time.
 
 =head1 FUNCTIONS
