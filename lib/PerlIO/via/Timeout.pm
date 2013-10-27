@@ -9,8 +9,6 @@ use Carp;
 use Errno qw(EBADF EINTR ETIMEDOUT);
 use Scalar::Util qw(reftype blessed weaken);
 
-use PerlIO::via::Timeout::Strategy::NoTimeout;
-
 use Exporter 'import'; # gives you Exporter's import() method directly
 our @EXPORT_OK = qw(read_timeout write_timeout enable_timeout disable_timeout timeout_enabled);
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
