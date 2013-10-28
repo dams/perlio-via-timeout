@@ -1,5 +1,7 @@
 {{$NEXT}}
 
+0.24      2013-10-28 20:44:53 Europe/Paris
+
 0.23      2013-10-10 14:43:52 Europe/Paris
         . Add internal method for inheritance features (for IO::Socket::Timeout)
 
