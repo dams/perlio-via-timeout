@@ -10,7 +10,9 @@ use Errno qw(EBADF EINTR ETIMEDOUT);
 use Scalar::Util qw(reftype blessed weaken);
 
 use Exporter 'import'; # gives you Exporter's import() method directly
+
 our @EXPORT_OK = qw(read_timeout write_timeout enable_timeout disable_timeout timeout_enabled);
+
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
 =head1 DESCRIPTION
@@ -18,6 +20,14 @@ our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 This package implements a PerlIO layer, that adds read / write timeout. This
 can be useful to avoid blocking while accessing a handle (file, socket, ...),
 and fail after some time.
+
+The timeout is implemented by using C<<select>> on the handle before
+reading/writing.
+
+B<WARNING> the handle won't timeout if you use C<sysread> or C<syswrite> on it,
+because these functions works at a lower level. Hower if you're trying to
+implement a timeout for a socket, see L<IO::Socket::Timeout> that implements
+exactly that.
 
 =head1 SYNOPSIS
 
