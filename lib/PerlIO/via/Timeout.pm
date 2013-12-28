@@ -190,7 +190,7 @@ Getter / setter of the read timeout value.
 
 sub read_timeout {
     my $prop = __PACKAGE__->_fh2prop($_[0]);
-    @_ > 1 and $prop->{read_timeout} = $_[1], _check_attributes($prop);
+    @_ > 1 and $prop->{read_timeout} = $_[1] || 0, _check_attributes($prop);
     $prop->{read_timeout};
 }
 
@@ -207,7 +207,7 @@ Getter / setter of the write timeout value.
 
 sub write_timeout {
     my $prop = __PACKAGE__->_fh2prop($_[0]);
-    @_ > 1 and $prop->{write_timeout} = $_[1], _check_attributes($prop);
+    @_ > 1 and $prop->{write_timeout} = $_[1] || 0, _check_attributes($prop);
     $prop->{write_timeout};
 }
 
