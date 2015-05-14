@@ -1,4 +1,6 @@
 {{$NEXT}}
+        . fixed a potential race condition case where read or write would be
+          blocking even with a timeout (thanks to Luciano Rocha)
 
 0.30      2015-05-13 20:33:08CEST+0200 Europe/Amsterdam
 

@@ -7,7 +7,9 @@ use Time::HiRes;
 use strict;
 use warnings;
 use Carp;
-use Errno qw(EBADF EINTR ETIMEDOUT);
+use Errno qw(EBADF EINTR ETIMEDOUT EAGAIN EWOULDBLOCK);
+use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK);
+
 
 use Exporter 'import'; # gives you Exporter's import() method directly
 
@@ -82,44 +84,80 @@ sub CLOSE {
     close $_[1] or -1;
 }
 
+sub _set_flags {
+    # params: FH, FLAGS
+    local $!;
+    fcntl($_[0], F_SETFL, $_[1])
+      or die "Can't set flags for the filehandle: $!\n";
+
+}
+
+sub _get_flags {
+    # params: FH
+    local $!;
+    my $flags = fcntl($_[0], F_GETFL, 0)
+      or die "Can't get flags for the filehandle: $!\n";
+    return $flags;
+}
+
 sub READ {
     # params: SELF, BUF, LEN, FH
     my ($self, undef, $len, $fh) = @_;
 
-    # There is a bug in PerlIO::via (possibly in PerlIO ?). We would like
-    # to return -1 to signify error, but doing so doesn't work (it usually
-    # segfault), it looks like the implementation is not complete. So we
-    # return 0.
     my ($prop, $fd) = __PACKAGE__->_fh2prop($fh);
 
     my $timeout_enabled = $prop->{timeout_enabled};
     my $read_timeout    = $prop->{read_timeout};
 
     my $offset = 0;
-    while ($len) {
-        if ( $timeout_enabled && $read_timeout && $len && ! _can_read_write($fh, $fd, $read_timeout, 0)) {
-            $! ||= ETIMEDOUT;
-            return 0;
+
+    if ( ! $timeout_enabled || ! $read_timeout) {
+        while ($len) {
+            my $r = sysread($fh, $_[1], $len, $offset);
+            if (defined $r) {
+                last unless $r;
+                $len -= $r;
+                $offset += $r;
+            } elsif ($! != EINTR) {
+                # There is a bug in PerlIO::via (possibly in PerlIO ?). We would
+                # like to return -1 to signify error, but doing so doesn't work (it
+                # usually segfaults), it looks like the implementation is not
+                # complete. So we return 0.
+                return 0;
+            }
         }
-        my $r = sysread($fh, $_[1], $len, $offset);
-        if (defined $r) {
-            last unless $r;
-            $len -= $r;
-            $offset += $r;
+        return $offset;
+    } else {
+        my $flags = _get_flags($fh);
+        _set_flags($fh, $flags | O_NONBLOCK);
+        while ($len) {
+            if ($len && ! _can_read_write($fh, $fd, $read_timeout, 0)) {
+                $! ||= ETIMEDOUT;
+                $offset = 0;
+                last;
+            }
+            my $r = sysread($fh, $_[1], $len, $offset);
+            if (defined $r) {
+                last unless $r; #EOF
+                $len -= $r;
+                $offset += $r;
+            } elsif ($! != EINTR && $! != EAGAIN && $! != EWOULDBLOCK) {
+                # There is a bug in PerlIO::via (possibly in PerlIO ?). We would
+                # like to return -1 to signify error, but doing so doesn't work (it
+                # usually segfaults), it looks like the implementation is not
+                # complete. So we return 0.
+                $offset = 0;
+                last;
+            }
         }
-        elsif ($! != EINTR) {
-            # There is a bug in PerlIO::via (possibly in PerlIO ?). We would like
-            # to return -1 to signify error, but doing so doesn't work (it usually
-            # segfault), it looks like the implementation is not complete. So we
-            # return 0.
-            return 0;
-        }
+        _set_flags($fh, $flags);
+        return $offset;
     }
-    return $offset;
 }
 
 sub WRITE {
     # params: SELF, BUF, FH
+$DB::single = 1;
     my ($self, undef, $fh) = @_;
 
     my ($prop, $fd) = __PACKAGE__->_fh2prop($fh);
@@ -129,22 +167,39 @@ sub WRITE {
 
     my $len = length $_[1];
     my $offset = 0;
-    while ($len) {
-        if ( $len && $timeout_enabled && $write_timeout && ! _can_read_write($fh, $fd, $write_timeout, 1)) {
-            $! ||= ETIMEDOUT;
-            return -1;
+
+    if ( ! $timeout_enabled || ! $write_timeout) {
+        while ($len) {
+            my $r = syswrite($fh, $_[1], $len, $offset);
+            if (defined $r) {
+                $len -= $r;
+                $offset += $r;
+            } elsif ($! != EINTR) {
+                return -1;
+            }
         }
-        my $r = syswrite($fh, $_[1], $len, $offset);
-        if (defined $r) {
-            $len -= $r;
-            $offset += $r;
-            last unless $len;
+    } else {
+        my $flags = _get_flags($fh);
+        _set_flags($fh, $flags | O_NONBLOCK);
+        while ($len) {
+            if ( $len && ! _can_read_write($fh, $fd, $write_timeout, 1)) {
+                $! ||= ETIMEDOUT;
+                $offset = -1;
+                last;
+            }
+            my $r = syswrite($fh, $_[1], $len, $offset);
+            if (defined $r) {
+                $len -= $r;
+                $offset += $r;
+                last unless $len; # EOF
+            } elsif ($! != EINTR && $! != EAGAIN && $! != EWOULDBLOCK) {
+                $offset = -1;
+                last
+            }
         }
-        elsif ($! != EINTR) {
-            return -1;
-        }
+        _set_flags($fh, $flags);
+        return $offset;
     }
-    return $offset;
 }
 
 sub _can_read_write {
@@ -167,8 +222,8 @@ sub _can_read_write {
         if ($nfound == -1) {
             $! == EINTR
               or croak(qq/select(2): '$!'/);
-            redo if !$timeout || ($pending = $timeout - (Time::HiRes::time -
-            $initial)) > 0;
+            !$timeout || ($pending -= Time::HiRes::time - $initial) > 0
+              and next;
             $nfound = 0;
         }
         last;
