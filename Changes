@@ -1,4 +1,6 @@
 {{$NEXT}}
+
+0.31      2015-07-29 07:59:46CEST+0200 Europe/Paris
         . fixed a potential race condition case where read or write would be
           blocking even with a timeout (thanks to Luciano Rocha)
 
