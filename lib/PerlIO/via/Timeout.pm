@@ -157,7 +157,6 @@ sub READ {
 
 sub WRITE {
     # params: SELF, BUF, FH
-$DB::single = 1;
     my ($self, undef, $fh) = @_;
 
     my ($prop, $fd) = __PACKAGE__->_fh2prop($fh);
